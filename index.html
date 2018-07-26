@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>WebGL 3D Model Viewer Using three.js</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<script src="./socket.io/socket.io.js"></script>
+    <script src="three.js"></script>
+    <script src="Detector.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script src="OBJLoader.js"></script>
+    <script src="MTLLoader.js"></script>
+
+    <style>
+        body {
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            background: hsl(0, 0%, 10%);
+        }
+
+        p {
+            margin: 0;
+            padding: 0;
+        }
+
+        .left,
+        .right {
+            position: absolute;
+            color: #fff;
+            font-family: Geneva, sans-serif;
+        }
+
+        .left {
+            bottom: 1em;
+            left: 1em;
+            text-align: left;
+        }
+
+        .right {
+            top: 0;
+            right: 0;
+            text-align: right;
+        }
+
+        a {
+            color: #f58231;
+        }
+    </style>
+
+</head>
+<body>
+
+    <div class="left">
+        <!-- <p>Low-Poly Croupière<p> -->
+        <!--<p>powered by <a href="https://manu.ninja/" target="_top">three.js</a></p> -->
+    </div>
+
+   <!--  <a class="right" href="https://github.com/Lorti/webgl-3d-model-viewer-using-three.js" target="_top">
+        <img src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67">
+    </a> -->
+
+    <script>
+		var now,delta,then = Date.now();
+		var cube_material;
+		var g_aabbs;
+		var robot_runable = 1;
+		var g_axis_g0;
+		/*data interaction with server*/
+		var socket = io.connect('http://localhost');
+		socket.on('news', function (aabbs) {
+			//console.log(aabbs);
+			g_aabbs = aabbs;
+		});
+
+        if (!Detector.webgl) {
+            Detector.addGetWebGLMessage();
+        }
+
+        var container;
+
+        var camera, controls, scene, renderer;
+        var lighting, ambient, keyLight, fillLight, backLight;
+
+        var windowHalfX = window.innerWidth / 2;
+        var windowHalfY = window.innerHeight / 2;
+
+        var object_base;
+        var object_shoulder;
+        var object_arm;
+        var object_arm2;
+        var object_arm3;
+        var object_arm4;
+        var object_wrist;
+
+        var temp_arm_1;
+        var temp_arm_2;
+        var temp_arm_3;
+        var temp_arm_4;
+        var temp_arm_5;
+
+        var first_render_flag = 0;
+
+        var base_center;
+
+		var g_axis1_deg = 0.0;
+		var PI = 3.14159265359;
+		var g_axis1_max = 180.0 / 180.0 * PI;		
+		var g_axis1_min = -180.0/ 180.0 * PI;
+		var g_axis1_pos_dir_flag = 1;
+
+		var g_axis2_deg = 0.0;
+		var g_axis2_max = 155.0/ 180.0 * PI;		
+		var g_axis2_min = -105.0/ 180.0 * PI;
+		var g_axis2_pos_dir_flag = 1;
+		
+		var g_axis3_deg = 0.0;
+		var g_axis3_max = 150.0/ 180.0 * PI;		
+		var g_axis3_min = -165.0/ 180.0 * PI;
+		var g_axis3_pos_dir_flag = 1;
+
+		var g_axis4_deg = 0.0;
+		var g_axis4_max = 270.0/ 180.0 * PI;		
+		var g_axis4_min = -270.0/ 180.0 * PI;
+		var g_axis4_pos_dir_flag = 1;
+
+		var g_axis5_deg = 0.0;
+		var g_axis5_max = 145.0/ 180.0 * PI;		
+		var g_axis5_min = -145.0/ 180.0 * PI;
+		var g_axis5_pos_dir_flag = 1;
+
+
+		var g_axis6_deg = 0.0;
+		var g_axis6_max = 360.0/ 180.0 * PI;		
+		var g_axis6_min = -360.0/ 180.0 * PI;
+		var g_axis6_pos_dir_flag = 1;
+
+ 
+
+        //base_center: 0.534586 ,0.0972312, 0.5263385
+        var shoulder_AXIS = new THREE.Vector3( 0, 1, 0 ).normalize();
+        var shoulder_rotation_center = new THREE.Vector3(0,  0, 0);
+
+        var Arm_AXIS = new THREE.Vector3( 1, 0, 0 ).normalize();
+        //var arm_rotation_center = new THREE.Vector3(0, 46.5, 15);
+		var arm_rotation_center = new THREE.Vector3(0, 46.5, -15);
+
+        var Arm2_AXIS = new THREE.Vector3( 1, 0, 0 ).normalize();
+        var arm2_rotation_center = new THREE.Vector3(0, 121.5, -15);
+
+        var Arm3_AXIS = new THREE.Vector3( 0, 1, 0 ).normalize();
+        var arm3_rotation_center = new THREE.Vector3(0, 0, -15);
+
+        var Arm4_AXIS = new THREE.Vector3( -1, 0, 0 ).normalize();
+        var arm4_rotation_center = new THREE.Vector3(0, 202, -15);
+
+        var Arm5_AXIS = new THREE.Vector3( 0, 1, 0 ).normalize();
+        var arm5_rotation_center = new THREE.Vector3(0, 0, -15);
+
+		var axi1_degree_incre = (function () {
+			var d = 0.0;
+			return function () {
+				d=d+0.01;
+				return d;
+			}
+		});
+  
+        init();
+        animate();
+
+		var g_line_array = new Array();
+
+        function scene_add_line_box(p_min, p_max)
+        {
+            var line_array = new Array();
+
+            var p_min_x = p_min.clone(); p_min_x.x =  p_max.x;
+            var p_min_y = p_min.clone(); p_min_y.y =  p_max.y;
+            var p_min_z = p_min.clone(); p_min_z.z =  p_max.z;
+
+            var p_max_x = p_max.clone(); p_max_x.x =  p_min.x;
+            var p_max_y = p_max.clone(); p_max_y.y =  p_min.y;
+            var p_max_z = p_max.clone(); p_max_z.z =  p_min.z;
+
+            var line_geom = new THREE.Geometry();
+            line_geom.vertices.push(p_min, p_min_x, p_max_y, p_min_z, p_min);                    
+            line_array[0] = new THREE.Line( line_geom, new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.2 } ) );
+            
+            var line_geom = new THREE.Geometry();
+            line_geom.vertices.push(p_max, p_max_x, p_min_y, p_max_z, p_max);                    
+            line_array[1] = new THREE.Line( line_geom, new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.2 } ) );
+            
+            var line_geom = new THREE.Geometry();
+            line_geom.vertices.push(p_min, p_min_y, p_max_x, p_min_z, p_min);                    
+            line_array[2] = new THREE.Line( line_geom, new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.2 } ) );
+            
+            var line_geom = new THREE.Geometry();
+            line_geom.vertices.push(p_max, p_max_y, p_min_x, p_max_z, p_max);                    
+            line_array[3] = new THREE.Line( line_geom, new THREE.LineBasicMaterial( { color: 0xFF0000, opacity: 0.2 } ) );
+            
+            //draw a cube with 4 lines
+            for (var i = 0; i < 4; i++)
+            {
+				g_line_array.push(line_array[i]);
+                scene.add(line_array[i]);
+				//scene.remove(line_array[i]);
+            }
+        }
+
+        function init() {
+
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            /* Camera */
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.x = 300;
+            camera.position.y = 500;
+            camera.position.z = 300;
+
+            /* Scene */
+
+            scene = new THREE.Scene();
+            lighting = true;
+
+            ambient = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambient);
+
+            keyLight = new THREE.DirectionalLight(new THREE.Color('hsl(30, 100%, 75%)'), 1.0);
+            keyLight.position.set(-500, 500, 500);
+            scene.add(keyLight);
+
+            fillLight = new THREE.DirectionalLight(new THREE.Color('hsl(240, 100%, 75%)'), 0.75);
+            fillLight.position.set(300, 0, 300);
+
+            backLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            backLight.position.set(100, 0, -100);//.normalize();
+            
+            ambient.intensity = 0.25;
+            scene.add(keyLight);
+            scene.add(fillLight);
+            scene.add(backLight);
+
+            /* Model */
+
+            var mtlLoader = new THREE.MTLLoader();
+            //mtlLoader.setBaseUrl('assets/');
+			mtlLoader.setBaseUrl('http://192.168.204.1:8080/assets/');
+            //mtlLoader.setPath('assets/');
+			mtlLoader.setPath('http://192.168.204.1:8080/assets/');
+            mtlLoader.load('female-croupier-2013-03-26.mtl', function (materials) {
+
+                materials.preload();
+
+                //materials.materials.default.map.magFilter = THREE.NearestFilter;
+                //materials.materials.default.map.minFilter = THREE.LinearFilter;
+
+                var objLoader = new THREE.OBJLoader();
+                objLoader.setMaterials(materials);
+                //objLoader.setPath('assets/');
+				objLoader.setPath('http://192.168.204.1:8080/assets/');
+                // objLoader.load('female-croupier-2013-03-26.obj', function (object) {
+
+                //     scene.add(object);
+
+                // });
+
+                // objLoader.load('robot_all.obj', function (object) {
+
+                //     scene.add(object);
+
+                // });
+
+
+                
+                //objLoader.load('robot_base.obj', function (object) {
+				objLoader.load('link0.obj', function (object) {
+                    object_base = object;
+
+                    // base_box = new THREE.Box3().setFromObject( object_base.children[0] );
+                    
+                    // base_center = new THREE.Vector3((base_box.max.x + base_box.min.x)/2, (base_box.max.y + base_box.min.y)/2, (base_box.max.z + base_box.min.z)/2);
+                    // console.log(base_center);
+                    // base_box.center( object_base.children[0].position ); // this re-sets the mesh position
+                    // console.log(object_base.children[0].position);
+                    // object_base.children[0].position.multiplyScalar( - 1 );
+
+
+                    // base_center = object_base.position;
+                    // scene.add(object_base);
+                });
+
+
+
+                objLoader.load('link1.obj', function (object) {
+                    object_shoulder = object;
+                    
+                    // console.log(object_base);
+                    // object_base.add(object_shoulder);
+                    // scene.add(object_shoulder);
+
+                });
+
+                objLoader.load('link2.obj', function (object) {
+                    object_arm = object;
+                    // base_box.center(object_arm.children[0].position);
+                    // object_arm.children[0].position.multiplyScalar( -1 );
+                    // scene.add(object_arm);
+                    // console.log(object_shoulder);
+                    // object_shoulder.add(object_arm);
+                });
+                
+                objLoader.load('link3.obj', function (object) {
+                    object_arm2 = object;
+                    // scene.add(object);
+
+                });
+
+                objLoader.load('link4.obj', function (object) {
+                    object_arm3 = object;
+                    // scene.add(object);
+
+                });
+
+                objLoader.load('link5.obj', function (object) {
+                    object_arm4 = object;
+                    // scene.add(object);
+
+                });
+
+                objLoader.load('link6.obj', function (object) {
+                    object_wrist = object;
+                    // scene.add(object);
+
+                });
+
+                scene.add( new THREE.AxisHelper( 300 ) );
+				
+				g_axis_g0 = new THREE.AxisHelper( 20 );
+				
+				scene.add( g_axis_g0 );
+            });
+
+            //console.log("object+base"+object_base);
+            // scene.add(object_base);
+
+
+            /* Renderer */
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(new THREE.Color("hsl(0, 0%, 10%)"));
+
+            container.appendChild(renderer.domElement);
+
+            /* Controls */
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.enableZoom = false;
+
+            /* Events */
+
+            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('keydown', onKeyboardEvent, false);
+
+        }
+
+        function onWindowResize() {
+
+            windowHalfX = window.innerWidth / 2;
+            windowHalfY = window.innerHeight / 2;
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+        }
+
+        function onKeyboardEvent(e) {
+
+            if (e.code === 'KeyL') {
+
+                lighting = !lighting;
+
+                if (lighting) {
+
+                    ambient.intensity = 0.25;
+                    //scene.add(keyLight);
+                    //scene.add(fillLight);
+                    //scene.add(backLight);
+
+                } else {
+
+                    ambient.intensity = 1.0;
+                    //scene.remove(keyLight);
+                    //scene.remove(fillLight);
+                    //scene.remove(backLight);
+
+                }
+
+            }
+
+        }
+
+        function animate() {
+
+            
+
+            //requestAnimationFrame(animate);
+
+			 setTimeout( function() {
+
+				requestAnimationFrame( animate );
+
+			}, 1000 / 10 );
+
+            controls.update();
+
+                      
+
+            // console.log(base_center);//.rotation.y += 0.5;
+            // object_base.children[0].translate(0, 0, 0);
+            // 
+            // object_base.
+            // object_base.children[0].geometry.translate( -base_center.x, 0, 0);
+            // object_base.rotation.y += 0.05;
+            // object_base.children[0].rotateOnAxis(Base_AXIS, 0.1)
+            
+
+            
+
+
+            // object_base.children[0].geometry.translate(-base_center.x, -base_center.y, -base_center.z);
+            if (object_base && object_shoulder && object_arm && object_arm2 && object_arm3 && object_arm4 && object_wrist) {
+                if (first_render_flag == 0) {
+                    // base_box.center(object_shoulder.children[0].position);
+                    // object_shoulder.children[0].position.multiplyScalar( - 1 );
+
+                    // base_box.center(object_arm.children[0].position);
+                    // object_arm.children[0].position.multiplyScalar( - 1 );
+
+                    // base_box.center(object_arm2.children[0].position);
+                    // object_arm2.children[0].position.multiplyScalar( - 1 );
+
+                    // base_box.center(object_arm3.children[0].position);
+                    // object_arm3.children[0].position.multiplyScalar( - 1 );
+
+                    // base_box.center(object_arm4.children[0].position);
+                    // object_arm4.children[0].position.multiplyScalar( - 1 );
+
+                    // base_box.center(object_wrist.children[0].position);
+                    // object_wrist.children[0].position.multiplyScalar( - 1 );
+
+                    
+                    // add arm
+                    temp_shoulder = new THREE.Group();
+                    temp_arm_1 = new THREE.Group();
+                    temp_arm_2 = new THREE.Group();
+                    temp_arm_3 = new THREE.Group();
+                    temp_arm_4 = new THREE.Group();
+                    temp_arm_5 = new THREE.Group();
+                    temp_arm_6 = new THREE.Group();
+
+                    object_shoulder.position.x -= shoulder_rotation_center.x;
+                    object_shoulder.position.y -= shoulder_rotation_center.y;
+                    object_shoulder.position.z -= shoulder_rotation_center.z;
+
+                    temp_shoulder.position.x += shoulder_rotation_center.x;
+                    temp_shoulder.position.y += shoulder_rotation_center.y;
+                    temp_shoulder.position.z += shoulder_rotation_center.z;   
+                    
+                    object_arm.position.x -= arm_rotation_center.x;
+                    object_arm.position.y -= arm_rotation_center.y;
+                    object_arm.position.z -= arm_rotation_center.z;
+
+                    temp_arm_1.position.x += arm_rotation_center.x;
+                    temp_arm_1.position.y += arm_rotation_center.y;
+                    temp_arm_1.position.z += arm_rotation_center.z;
+
+                    object_arm2.position.x -= arm2_rotation_center.x;
+                    object_arm2.position.y -= arm2_rotation_center.y;
+                    object_arm2.position.z -= arm2_rotation_center.z;
+
+
+                    temp_arm_2.position.x += arm2_rotation_center.x;
+                    temp_arm_2.position.y += arm2_rotation_center.y;
+                    temp_arm_2.position.z += arm2_rotation_center.z;
+
+                    object_arm3.position.x -= arm3_rotation_center.x;
+                    object_arm3.position.y -= arm3_rotation_center.y;
+                    object_arm3.position.z -= arm3_rotation_center.z;
+
+
+                    temp_arm_3.position.x += arm3_rotation_center.x;
+                    temp_arm_3.position.y += arm3_rotation_center.y;
+                    temp_arm_3.position.z += arm3_rotation_center.z;
+
+                    object_arm4.position.x -= arm4_rotation_center.x;
+                    object_arm4.position.y -= arm4_rotation_center.y;
+                    object_arm4.position.z -= arm4_rotation_center.z;
+
+
+                    temp_arm_4.position.x += arm4_rotation_center.x;
+                    temp_arm_4.position.y += arm4_rotation_center.y;
+                    temp_arm_4.position.z += arm4_rotation_center.z;
+
+
+                    object_wrist.position.x -= arm5_rotation_center.x;
+                    object_wrist.position.y -= arm5_rotation_center.y;
+                    object_wrist.position.z -= arm5_rotation_center.z;
+
+
+                    temp_arm_5.position.x += arm5_rotation_center.x;
+                    temp_arm_5.position.y += arm5_rotation_center.y;
+                    temp_arm_5.position.z += arm5_rotation_center.z;
+
+
+
+                    object_base.add(temp_shoulder);
+                    temp_shoulder.add(object_shoulder);
+                    
+                    object_shoulder.add(temp_arm_1);
+                    temp_arm_1.add(object_arm);   
+
+                    object_arm.add(temp_arm_2);
+                    temp_arm_2.add(object_arm2);
+
+                    object_arm2.add(temp_arm_3);
+                    temp_arm_3.add(object_arm3);
+
+                    object_arm3.add(temp_arm_4);
+                    temp_arm_4.add(object_arm4);
+
+                    object_arm4.add(temp_arm_5);
+                    temp_arm_5.add(object_wrist);
+
+					
+
+					
+
+
+
+                    scene.add(object_base);
+                    
+
+					var geometry = new THREE.BoxGeometry( 50, 50, 50 );
+					cube_material = new THREE.MeshBasicMaterial( {color: 0x00ff00, wireframe: true} );
+					var cube = new THREE.Mesh( geometry, cube_material);
+
+					cube.position.x = 100;
+					scene.add( cube );                    
+                    // object_arm.children[0].geometry.translate(-0.22, -0.35, -0.05);
+                    // object_base.position.x -= base_center.x;
+                    // object_base.position.y -= base_center.y;
+                    // object_base.position.z -= base_center.z;
+                    first_render_flag = 1;
+
+					
+                }
+               
+			   
+
+			   for (var i = 0; i < (g_aabbs?g_aabbs['nodes_count']:0); i++)
+					{
+					var p_min = new THREE.Vector3(g_aabbs['arr_min_x'][i], g_aabbs['arr_min_y'][i], g_aabbs['arr_min_z'][i]);
+					var p_max = new THREE.Vector3(g_aabbs['arr_max_x'][i], g_aabbs['arr_max_y'][i], g_aabbs['arr_max_z'][i]);
+					scene_add_line_box(p_min, p_max);
+					//console.log(p_min);					
+				}
+
+				if ((g_aabbs['collision_flag'] == 1) && (robot_runable == 1))
+				{
+					var cube_geometry = new THREE.BoxGeometry( 50, 50, 50 );
+					var cube_material = new THREE.MeshBasicMaterial( {color: 0xff0000, wireframe: false} );
+					var col_cube = new THREE.Mesh( cube_geometry, cube_material);
+
+					col_cube.position.x = 100;
+					robot_runable = 0;
+					scene.add( col_cube ); 
+				}
+				
+				//console.log(g_axis_g0);
+				if (g_aabbs['collision_flag'] != 1)
+				{
+					var axis_g0 = new THREE.AxisHelper( 20 );
+					
+					axis_g0.position.x = g_aabbs['g_x'];
+					axis_g0.position.y = g_aabbs['g_y'];
+					axis_g0.position.z = g_aabbs['g_z'];
+					scene.add( axis_g0 );
+				}
+			  
+
+				
+				/**/
+				if (robot_runable == 1)
+				{
+					if (g_axis1_deg + 0.03 > g_axis1_max)
+					{					
+						g_axis1_pos_dir_flag = 0;
+					}
+					if (g_axis1_deg - 0.03 < g_axis1_min)
+					{					
+						g_axis1_pos_dir_flag = 1;
+					}
+					
+					if (g_axis1_pos_dir_flag == 1)
+					{
+						temp_shoulder.rotateOnAxis(shoulder_AXIS, -0.03);                
+						g_axis1_deg += 0.03;
+					} else {
+						temp_shoulder.rotateOnAxis(shoulder_AXIS, +0.03);
+						g_axis1_deg -= 0.03;
+					}
+
+
+
+					if (g_axis2_deg + 0.03 > g_axis2_max)
+					{					
+						g_axis2_pos_dir_flag = 0;
+					}
+					if (g_axis2_deg - 0.03 < g_axis2_min)
+					{					
+						g_axis2_pos_dir_flag = 1;
+					}
+					
+					if (g_axis2_pos_dir_flag == 1)
+					{
+						temp_arm_1.rotateOnAxis(Arm_AXIS, -0.03);             
+						g_axis2_deg += 0.03;
+					} else {
+						temp_arm_1.rotateOnAxis(Arm_AXIS, 0.03);
+						g_axis2_deg -= 0.03;
+					}
+
+					
+
+					if (g_axis3_deg + 0.03 > g_axis3_max)
+					{					
+						g_axis3_pos_dir_flag = 0;
+					}
+					if (g_axis3_deg - 0.03 < g_axis3_min)
+					{					
+						g_axis3_pos_dir_flag = 1;
+					}
+					
+					if (g_axis3_pos_dir_flag == 1)
+					{
+						temp_arm_2.rotateOnAxis(Arm2_AXIS, +0.03);         
+						g_axis3_deg += 0.03;
+					} else {
+						temp_arm_2.rotateOnAxis(Arm2_AXIS, -0.03); 
+						g_axis3_deg -= 0.03;
+					} 
+					 
+					 
+					if (g_axis4_deg + 0.03 > g_axis4_max)
+					{					
+						g_axis4_pos_dir_flag = 0;
+					}
+					if (g_axis4_deg - 0.03 < g_axis4_min)
+					{					
+						g_axis4_pos_dir_flag = 1;
+					}
+					
+					if (g_axis4_pos_dir_flag == 1)
+					{
+						temp_arm_3.rotateOnAxis(Arm3_AXIS, 0.03);        
+						g_axis4_deg += 0.03;
+					} else {
+						temp_arm_3.rotateOnAxis(Arm3_AXIS, -0.03);
+						g_axis4_deg -= 0.03;
+					}
+					
+				  
+					if (g_axis5_deg + 0.03 > g_axis5_max)
+					{					
+						g_axis5_pos_dir_flag = 0;
+					}
+					if (g_axis5_deg - 0.03 < g_axis5_min)
+					{					
+						g_axis5_pos_dir_flag = 1;
+					}
+					
+					
+					
+					if (g_axis6_deg + 0.03 > g_axis6_max)
+					{					
+						g_axis6_pos_dir_flag = 0;
+					}
+					if (g_axis6_deg - 0.03 < g_axis6_min)
+					{					
+						g_axis6_pos_dir_flag = 1;
+					}
+					
+					if (g_axis6_pos_dir_flag == 1)
+					{
+						 temp_arm_5.rotateOnAxis(Arm5_AXIS, 0.03);  
+						g_axis6_deg += 0.03;
+					} else {
+						 temp_arm_5.rotateOnAxis(Arm5_AXIS, -0.03);
+						g_axis6_deg -= 0.03;
+					}
+				}
+               /*
+                if (g_axis5_pos_dir_flag == 1)
+				{
+					temp_arm_4.rotateOnAxis(Arm4_AXIS, 3.1415926 / 2);     
+					g_axis5_deg += 3.1415926 / 2;
+					g_axis5_pos_dir_flag = 0;
+				}*/ 
+                // object_shoulder.rotation.y += 0.01;
+				
+            }
+            // object_base.updateMatrix();
+            // object_base.children[0].geometry.translate(base_center.x, base_center.y, base_center.z);
+
+            // object_base.updateMatrix();
+			socket.emit('my other event', { axis1: g_axis1_deg, axis2: g_axis2_deg, axis3: g_axis3_deg, axis4: g_axis4_deg, axis5: g_axis5_deg, axis6: g_axis6_deg });
+			now = Date.now();
+			delta = now - then;
+			then = now;
+			//console.log(delta);
+            render();  
+			if (g_line_array)
+			{
+			
+				var last_line = g_line_array.pop();
+				while (last_line)
+				{
+					scene.remove(last_line);
+					last_line.geometry.dispose();
+					last_line.material.dispose();
+					last_line = g_line_array.pop();
+					
+				}
+			}
+        }
+
+        function render() {
+
+            renderer.render(scene, camera);
+
+        }
+
+    </script>
+
+</body>
+</html>
